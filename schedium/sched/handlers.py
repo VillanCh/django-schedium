@@ -2,6 +2,8 @@
 # coding:utf-8
 import traceback
 import typing
+import threading
+from django.db import connections
 from datetime import datetime, timedelta
 from schedium import models
 
@@ -88,6 +90,7 @@ class ScheduleModelTaskHandler(TaskHandlerBase):
         if not current_task:
             return
 
+
         if current_task.task_type not in self._callbacks:
             current_task.delete()
             return
@@ -107,7 +110,7 @@ class ScheduleModelTaskHandler(TaskHandlerBase):
                 next_time=current_task.next_execute_datetime
             )
         elif isinstance(current_task, models.SchediumLoopModelTask):
-            return SchediumTask(
+            task = SchediumTask(
                 self.execute_target, (), {
                     "target": callback,
                     "vargs": (),
@@ -115,9 +118,12 @@ class ScheduleModelTaskHandler(TaskHandlerBase):
                         "task_id": current_task.relative_id
                     },
                     "id": current_task.schedium_id,
-                }, current_task.schedium_id, None, None, None, first=True,
+                }, current_task.schedium_id, start=current_task.start_time,
+                end=current_task.end_time, interval=current_task.interval_seconds,
+                first=current_task.first,
                 next_time=current_task.next_execute_datetime
             )
+            return task
 
 
     def execute_target(self, target: typing.Callable, vargs: typing.Tuple, kwargs: typing.Mapping, id=None):

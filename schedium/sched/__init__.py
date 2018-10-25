@@ -141,6 +141,8 @@ class Sched(object):
 
     def _execute(self, target, vargs, kwargs):
         target(*vargs, **kwargs)
+        self._current_task = None
+
         self.update()
 
         if isinstance(self._task_handler, ScheduleModelTaskHandler):
@@ -150,4 +152,3 @@ class Sched(object):
         self._auto_update_event.clear()
 
         self._auto_update_thread.join()
-

@@ -1,10 +1,10 @@
 import time
 import threading
-from django.test import TestCase
+from django.test import TestCase, TransactionTestCase
 from schedium.sched import Sched, handlers
 from schedium import models
 
-# from django.db import connections, transaction
+from django.db import connections, transaction
 
 check_table = {
     "loop": 0
@@ -36,7 +36,7 @@ def thread_ss():
 
 
 # Create your tests here.
-class SchediumTestCase(TestCase):
+class SchediumTestCase(TransactionTestCase):
 
     def setUp(self):
         self.assertTrue(models.SchediumLoopModelTask.objects.all().count() == 0)
@@ -47,13 +47,15 @@ class SchediumTestCase(TestCase):
         )
         task.save(force_update=True)
 
+
         task = models.SchediumDelayModelTask.objects.create(
             task_type="test", relative_id="test-id",
             delay_seconds=2,
         )
         task.save(force_update=True)
 
-        time.sleep(0.5)
+        models.SchediumLoopModelTask.objects.all().update()
+        print(models.SchediumLoopModelTask.objects.all())
 
     def test_schedium_delay_task(self):
         # self.assertTrue(models.SchediumLoopModelTask.objects.all().count() > 0)

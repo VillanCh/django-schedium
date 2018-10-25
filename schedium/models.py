@@ -58,7 +58,7 @@ class SchediumLoopModelTask(models.Model):
             if self.first:
                 self.next_execute_datetime = self.start_time
             else:
-                self.next_execute_datetime = self.start_time + timedelta(self.interval_seconds)
+                self.next_execute_datetime = self.start_time + timedelta(seconds=self.interval_seconds)
 
         return super().save(force_insert, force_update, using, update_fields)
 
