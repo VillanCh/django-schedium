@@ -11,20 +11,23 @@ check_table = {
 }
 
 
+schedium_handler = handlers.ScheduleModelTaskHandler()
+
+@schedium_handler.schedium_task_callback(task_type="test")
 def test(task_id):
     print("task_id: {} is executed.".format(task_id))
     check_table['delay'] = True
 
+print("Registered test function: {}".format(test))
 
 def looptest(task_id):
     print("loop task_id: {} is executed".format(task_id))
     check_table["loop"] += 1
 
 
-schedium_handler = handlers.ScheduleModelTaskHandler()
-schedium_handler.register(
-    "test", test
-)
+# schedium_handler.register(
+#     "test", test
+# )
 schedium_handler.register(
     "loop", looptest
 )
@@ -80,10 +83,10 @@ class SchediumTestCase(TransactionTestCase):
         # self.assertTrue(models.SchediumLoopModelTask.objects.all().count() > 0)
         self.assertEqual(check_table["loop"], 1)
         #
-        # time.sleep(2)
-        # self.assertEqual(check_table["loop"], 2)
-        # time.sleep(2)
-        # self.assertEqual(check_table["loop"], 3)
+        time.sleep(2)
+        self.assertEqual(check_table["loop"], 2)
+        time.sleep(2)
+        self.assertEqual(check_table["loop"], 3)
 
     def tearDown(self):
         self.sche.shutdown()

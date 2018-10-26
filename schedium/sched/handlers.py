@@ -2,8 +2,7 @@
 # coding:utf-8
 import traceback
 import typing
-import threading
-from django.db import connections
+from functools import wraps
 from datetime import datetime, timedelta
 from schedium import models
 
@@ -62,6 +61,20 @@ class ScheduleModelTaskHandler(TaskHandlerBase):
     def register(self, task_type: str, callback: typing.Callable):
         self._callbacks[task_type] = callback
 
+    # decorator for register callback.
+    def schedium_task_callback(self, task_type):
+
+        def register_callback(func):
+            self.register(task_type, func)
+
+            @wraps(func)
+            def wrapper(*args, **kwargs):
+                return func(*args, **kwargs)
+
+            return wrapper
+
+        return register_callback
+
     def get_next_task(self):
         delay_task = None
         current_task = None
@@ -89,7 +102,6 @@ class ScheduleModelTaskHandler(TaskHandlerBase):
 
         if not current_task:
             return
-
 
         if current_task.task_type not in self._callbacks:
             current_task.delete()
@@ -124,7 +136,6 @@ class ScheduleModelTaskHandler(TaskHandlerBase):
                 next_time=current_task.next_execute_datetime
             )
             return task
-
 
     def execute_target(self, target: typing.Callable, vargs: typing.Tuple, kwargs: typing.Mapping, id=None):
         try:
