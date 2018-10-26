@@ -152,3 +152,14 @@ class Sched(object):
         self._auto_update_event.clear()
 
         self._auto_update_thread.join()
+
+
+schedium_model_task_handler = None
+
+def _initial_schedium_model_task_handler():
+    global schedium_model_task_handler
+    if schedium_model_task_handler:
+        raise RuntimeError("the ScheduleModelTaskHandler is initialed. donot initial again")
+    else:
+        schedium_model_task_handler = ScheduleModelTaskHandler()
+        return schedium_model_task_handler

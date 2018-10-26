@@ -1,10 +1,7 @@
 import time
-import threading
-from django.test import TestCase, TransactionTestCase
+from django.test import TransactionTestCase
 from schedium.sched import Sched, handlers
 from schedium import models
-
-from django.db import connections, transaction
 
 check_table = {
     "loop": 0
