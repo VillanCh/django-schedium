@@ -5,7 +5,6 @@ from django.utils.timezone import timedelta, now
 
 # Create your models here.
 class SchediumDelayModelTask(models.Model):
-
     schedium_id = models.CharField(max_length=200, null=False, primary_key=True, default=uuid.uuid4)
 
     task_type = models.CharField(max_length=2000, null=False, default="default")
@@ -17,6 +16,8 @@ class SchediumDelayModelTask(models.Model):
     next_execute_datetime = models.DateTimeField(null=False)
 
     is_finished = models.BooleanField(null=False, default=False)
+
+    in_sched = models.BooleanField(null=False, default=False)
 
     def save(self, force_insert=False, force_update=False, using=None,
              update_fields=None):
@@ -30,7 +31,6 @@ class SchediumDelayModelTask(models.Model):
 
 
 class SchediumLoopModelTask(models.Model):
-
     schedium_id = models.CharField(max_length=200, null=False, primary_key=True, default=uuid.uuid4)
     task_type = models.CharField(max_length=2000, null=False, default="default")
     relative_id = models.CharField(max_length=2000, null=False)
@@ -43,6 +43,8 @@ class SchediumLoopModelTask(models.Model):
     next_execute_datetime = models.DateTimeField(null=False)
 
     is_finished = models.BooleanField(null=False, default=False)
+
+    in_sched = models.BooleanField(null=False, default=False)
 
     def save(self, force_insert=False, force_update=False, using=None,
              update_fields=None):
@@ -61,4 +63,3 @@ class SchediumLoopModelTask(models.Model):
                 self.next_execute_datetime = self.start_time + timedelta(seconds=self.interval_seconds)
 
         return super().save(force_insert, force_update, using, update_fields)
-
