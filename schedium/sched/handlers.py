@@ -117,7 +117,7 @@ class ScheduleModelTaskHandler(TaskHandlerBase):
                 return
 
             if current_task.task_type not in self._callbacks:
-                current_task.delete()
+                # current_task.delete()
                 return
 
             if not current_task.in_sched:

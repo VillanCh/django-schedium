@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # coding:utf-8
 import uuid
+import multiprocessing
 import typing
 from datetime import datetime, timedelta
 from threading import Timer, Thread, Event
@@ -16,7 +17,7 @@ class _CurrentTask(Timer):
     def __init__(self, id: str, next_execute_time: datetime, target: typing.Callable, vargs: tuple = (),
                  kwargs: typing.Optional[typing.Mapping] = None):
         self.next_execute_time: datetime = next_execute_time
-        interval = max(next_execute_time.timestamp() - time.time(), 0)
+        interval = max(next_execute_time.timestamp() - time.time(), 0.1)
         self.id = id
 
         Timer.__init__(self, interval=interval, function=target, args=vargs, kwargs=kwargs)

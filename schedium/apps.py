@@ -7,3 +7,4 @@ class SchediumConfig(AppConfig):
     def ready(self):
         from . import core
         return core.schediumer
+  
