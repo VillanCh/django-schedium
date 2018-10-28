@@ -2,7 +2,6 @@
 # coding:utf-8
 from .sched import handlers
 from .sched.sched import Sched
-from .sched.chan import SchediumChannel
 
 
 class _Schediumer(object):
@@ -10,7 +9,6 @@ class _Schediumer(object):
     def __init__(self):
         self.handler = handlers.ScheduleModelTaskHandler()
         self.sched = Sched(update_interval=30, task_handler=self.handler)
-        self.channel = SchediumChannel()
 
         self.auto_update(1)
 
@@ -26,7 +24,6 @@ class _Schediumer(object):
     def reset(self, auto_update_interval=30):
         self.shutdown()
         self.auto_update(auto_update_interval)
-
 
 
 schediumer = _Schediumer()
