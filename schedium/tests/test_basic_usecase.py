@@ -40,16 +40,12 @@ class SchediumTestCase(TransactionTestCase):
             task_type="loop", relative_id="test0-dasdfasdf",
             interval_seconds=2, first=False
         )
-        task.save(force_update=True)
+        print("LOOP TASK: id->{} in_sched->{}".format(task.schedium_id, task.in_sched))
 
         task = models.SchediumDelayModelTask.objects.create(
-            task_type="test", relative_id="test-id",
+            task_type="test", relative_id="task-id",
             delay_seconds=2,
         )
-        task.save(force_update=True)
-
-        models.SchediumLoopModelTask.objects.all().update()
-        print(models.SchediumLoopModelTask.objects.all())
 
     def test_schedium_delay_task(self):
         # self.assertTrue(models.SchediumLoopModelTask.objects.all().count() > 0)
@@ -66,10 +62,12 @@ class SchediumTestCase(TransactionTestCase):
 
         # self.assertTrue(models.SchediumLoopModelTask.objects.all().count() > 0)
         time.sleep(2.1)
-        self.assertIn("delay", check_table)
-        #
+
         # self.assertTrue(models.SchediumLoopModelTask.objects.all().count() > 0)
         self.assertEqual(check_table["loop"], 1)
+
+        self.assertIn("delay", check_table)
+
         #
         time.sleep(2)
         self.assertEqual(check_table["loop"], 2)

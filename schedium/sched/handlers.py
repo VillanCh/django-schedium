@@ -82,46 +82,47 @@ class ScheduleModelTaskHandler(TaskHandlerBase):
 
         return register_callback
 
-    @transaction.atomic
     def get_next_task(self):
         delay_task = None
         current_task = None
 
-        try:
-            delay_task = \
-                models.SchediumDelayModelTask.objects.select_for_update(). \
-                    filter(is_finished=False, in_sched=False).order_by("next_execute_datetime")[0]
-            current_task = delay_task or None
-        except IndexError:
-            pass
+        with transaction.atomic():
+            try:
+                delay_task = \
+                    models.SchediumDelayModelTask.objects.select_for_update(). \
+                        filter(is_finished=False, in_sched=False).order_by("next_execute_datetime")[0]
+                current_task = delay_task or None
+            except IndexError:
+                pass
 
-        try:
-            loop_task = \
-                models.SchediumLoopModelTask.objects.select_for_update(). \
-                    filter(is_finished=False, in_sched=False).order_by("next_execute_datetime")[0]
-            if current_task:
-                if delay_task:
-                    if loop_task:
-                        current_task = loop_task if loop_task.next_execute_datetime <= delay_task.next_execute_datetime \
-                            else delay_task
+            try:
+                loop_task = \
+                    models.SchediumLoopModelTask.objects.select_for_update(). \
+                        filter(is_finished=False, in_sched=False).order_by("next_execute_datetime")[0]
+                if current_task:
+                    if delay_task:
+                        if loop_task:
+                            current_task = loop_task if loop_task.next_execute_datetime <= delay_task.next_execute_datetime \
+                                else delay_task
+                        else:
+                            current_task = delay_task
                     else:
-                        current_task = delay_task
+                        current_task = loop_task
                 else:
                     current_task = loop_task
-            else:
-                current_task = loop_task
-        except IndexError:
-            traceback.format_exc()
+            except IndexError:
+                traceback.format_exc()
 
-        if not current_task:
-            return
+            if not current_task:
+                return
 
-        if current_task.task_type not in self._callbacks:
-            current_task.delete()
-            return
+            if current_task.task_type not in self._callbacks:
+                current_task.delete()
+                return
 
-        current_task.in_sched = True
-        current_task.save(update_fields=['in_sched', ])
+            if not current_task.in_sched:
+                current_task.in_sched = True
+                current_task.save()
 
         callback = self._callbacks[current_task.task_type]
 
@@ -138,15 +139,17 @@ class ScheduleModelTaskHandler(TaskHandlerBase):
                 next_time=current_task.next_execute_datetime
             )
         elif isinstance(current_task, models.SchediumLoopModelTask):
+            params = {
+                "target": callback,
+                "vargs": (),
+                "kwargs": {
+                    "task_id": current_task.relative_id
+                },
+                "id": current_task.schedium_id,
+            }
             task = SchediumTask(
-                self.execute_target, (), {
-                    "target": callback,
-                    "vargs": (),
-                    "kwargs": {
-                        "task_id": current_task.relative_id
-                    },
-                    "id": current_task.schedium_id,
-                }, current_task.schedium_id, start=current_task.start_time,
+                self.execute_target, vargs=(), kwargs=params,
+                id=current_task.schedium_id, start=current_task.start_time,
                 end=current_task.end_time, interval=current_task.interval_seconds,
                 first=current_task.first,
                 next_time=current_task.next_execute_datetime
@@ -159,12 +162,16 @@ class ScheduleModelTaskHandler(TaskHandlerBase):
         except Exception:
             traceback.print_exc()
 
+        self._release_task(id)
+
+    def _release_task(self, id):
         delay_task_queryset = models.SchediumDelayModelTask.objects.filter(is_finished=False)
         try:
             delay_task = delay_task_queryset.get(schedium_id=id)
             delay_task.is_finished = True
             delay_task.in_sched = False
             delay_task.save()
+            return
         except delay_task_queryset.model.DoesNotExist:
             pass
 
@@ -185,6 +192,9 @@ class ScheduleModelTaskHandler(TaskHandlerBase):
     def cancel(self, id):
         models.SchediumDelayModelTask.objects.filter(schedium_id=id).update({"is_finished": True})
         models.SchediumLoopModelTask.objects.filter(schedium_id=id).update({"is_finished": True})
+
+    def delay_task(self, schedium_id):
+        self._release_task(id=schedium_id)
 
 
 class DefaultTaskHandler(TaskHandlerBase):
@@ -251,3 +261,6 @@ class DefaultTaskHandler(TaskHandlerBase):
         task = self.tasks_table.pop(id)
         if task in self.tasks:
             self.tasks.remove(task)
+
+    def delay_task(self, schedium_id):
+        pass

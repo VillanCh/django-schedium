@@ -121,6 +121,7 @@ class Sched(object):
 
             if self._current_task.is_alive():
                 self._current_task.cancel()
+                self.delay_task(self._current_task.id)
 
         self._current_task = _CurrentTask(
             id=task.id, next_execute_time=task.next_time, target=self._execute,
@@ -132,6 +133,9 @@ class Sched(object):
         )
         self._current_task.daemon = True
         self._current_task.start()
+
+    def delay_task(self, schedium_id):
+        self._task_handler.delay_task(schedium_id)
 
     def cancel(self, id):
         if self._current_task.id == id:
@@ -155,6 +159,7 @@ class Sched(object):
 
 
 schedium_model_task_handler = None
+
 
 def _initial_schedium_model_task_handler():
     global schedium_model_task_handler
