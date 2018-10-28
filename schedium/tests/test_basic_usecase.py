@@ -3,32 +3,26 @@ from django.test import TransactionTestCase
 from schedium.sched.sched import Sched
 from schedium.sched import handlers
 from schedium import models
+from schedium.core import schediumer
 
 check_table = {
     "loop": 0
 }
 
 
-schedium_handler = handlers.ScheduleModelTaskHandler()
-
-@schedium_handler.schedium_task_callback(task_type="test")
+@schediumer.register_task_handler("test")
 def test(task_id):
     print("task_id: {} is executed.".format(task_id))
     check_table['delay'] = True
 
+
 print("Registered test function: {}".format(test))
 
+
+@schediumer.register_task_handler("loop")
 def looptest(task_id):
     print("loop task_id: {} is executed".format(task_id))
     check_table["loop"] += 1
-
-
-# schedium_handler.register(
-#     "test", test
-# )
-schedium_handler.register(
-    "loop", looptest
-)
 
 
 def thread_ss():
@@ -48,7 +42,6 @@ class SchediumTestCase(TransactionTestCase):
         )
         task.save(force_update=True)
 
-
         task = models.SchediumDelayModelTask.objects.create(
             task_type="test", relative_id="test-id",
             delay_seconds=2,
@@ -60,10 +53,7 @@ class SchediumTestCase(TransactionTestCase):
 
     def test_schedium_delay_task(self):
         # self.assertTrue(models.SchediumLoopModelTask.objects.all().count() > 0)
-
-        self.sche = Sched(task_handler=schedium_handler)
-        self.sche.start_auto_update(1, 1)
-        self.sche.update()
+        schediumer.reset(1)
 
         time.sleep(0.2)
 
@@ -87,5 +77,5 @@ class SchediumTestCase(TransactionTestCase):
         self.assertEqual(check_table["loop"], 3)
 
     def tearDown(self):
-        self.sche.shutdown()
+        schediumer.shutdown()
         # connections.close_all()

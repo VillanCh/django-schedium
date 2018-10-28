@@ -25,7 +25,7 @@ class _Schediumer(object):
 
     def reset(self, auto_update_interval=30):
         self.shutdown()
-        self.auto_update()
+        self.auto_update(auto_update_interval)
 
 
 
