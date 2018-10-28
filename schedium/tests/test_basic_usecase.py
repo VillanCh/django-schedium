@@ -1,6 +1,7 @@
 import time
 from django.test import TransactionTestCase
-from schedium.sched import Sched, handlers
+from schedium.sched.sched import Sched
+from schedium.sched import handlers
 from schedium import models
 
 check_table = {

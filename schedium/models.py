@@ -1,6 +1,6 @@
 from django.db import models
 import uuid
-from django.utils.timezone import timedelta, datetime
+from django.utils.timezone import timedelta, now
 
 
 # Create your models here.
@@ -21,7 +21,7 @@ class SchediumDelayModelTask(models.Model):
     def save(self, force_insert=False, force_update=False, using=None,
              update_fields=None):
         if not self.start_time:
-            self.start_time = datetime.utcnow()
+            self.start_time = now()
 
         if not self.next_execute_datetime:
             self.next_execute_datetime = self.start_time + timedelta(seconds=self.delay_seconds)
@@ -48,7 +48,7 @@ class SchediumLoopModelTask(models.Model):
              update_fields=None):
 
         if not self.start_time:
-            self.start_time = datetime.utcnow()
+            self.start_time = now()
 
         if self.end_time:
             if self.end_time < self.start_time:

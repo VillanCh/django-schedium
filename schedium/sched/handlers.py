@@ -4,7 +4,12 @@ import traceback
 import typing
 from functools import wraps
 from datetime import datetime, timedelta
+from django.utils import timezone
 from schedium import models
+
+SCHEDIUM_MODEL_TASK_HANDLER_CALLBACKS = {
+
+}
 
 
 class SchediumTask(object):
@@ -57,6 +62,7 @@ class ScheduleModelTaskHandler(TaskHandlerBase):
 
     def __init__(self):
         self._callbacks = {}
+        self._callbacks.update(SCHEDIUM_MODEL_TASK_HANDLER_CALLBACKS)
 
     def register(self, task_type: str, callback: typing.Callable):
         self._callbacks[task_type] = callback
@@ -154,7 +160,9 @@ class ScheduleModelTaskHandler(TaskHandlerBase):
         loop_task_queryset = models.SchediumLoopModelTask.objects.filter(is_finished=False)
         try:
             loop_task = loop_task_queryset.get(schedium_id=id)
-            loop_task.next_execute_datetime += timedelta(seconds=loop_task.interval_seconds)
+            now = timezone.now()
+            while loop_task.next_execute_datetime < now:
+                loop_task.next_execute_datetime += timedelta(seconds=loop_task.interval_seconds)
             if loop_task.end_time:
                 loop_task.is_finished = loop_task.next_execute_datetime > loop_task.end_time
             loop_task.save()
