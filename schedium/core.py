@@ -29,6 +29,7 @@ class Schedium(object):
         self._tick_thread = None
 
         self._tick_start_event = Event()
+        self._update_in_next_tick = Event()
 
         self._tick_count = 0
 
@@ -45,10 +46,10 @@ class Schedium(object):
         if not self._tick_start_event.is_set():
             self._tick_start_event.set()
 
-        self._tasks = self.safe_fetch_tasks()
+        self._tasks = self.sync_database()
 
         while self._tick_start_event.is_set():
-            logger.warning("Schedium: {} tick: {}".format(self._id, time.time()))
+            logger.debug("Schedium: {} tick: {}".format(self._id, time.time()))
 
             self._tick()
 
@@ -59,26 +60,33 @@ class Schedium(object):
 
         connections.close_all()
 
+    @transaction.atomic
+    def sync_database(self, tasks: typing.List[models.SchediumTaskNamedTuple] = None):
+        sched_ids = [task.sched_id for task in (tasks or self._tasks)]
+        models.SchediumTask.objects.select_for_update().filter(
+            sched_id__in=sched_ids
+        ).update(
+            in_sched=False
+        )
 
-    def sync_database(self):
-        with transaction.atomic():
-            now = time.time()
-            queryset = models.SchediumTask.objects.select_for_update().filter(
-                next_time__lte=now + 10 * self.tick_interval, in_sched=False, is_finished=False
-            )
-            tasks = [task.dump_named_tuple() for task in queryset.all()]
-            queryset.update(in_sched=True)
+        now = time.time()
+        queryset = models.SchediumTask.objects.select_for_update().filter(
+            next_time__lte=now + 10 * self.tick_interval, in_sched=False, is_finished=False
+        )
+        tasks = [task.dump_named_tuple() for task in queryset.all()]
+        queryset.update(in_sched=True)
 
-        
         return tasks
 
-    def _tick(self):
-        if self._tick_count % 10 == 0:
-            if self._tasks:
-                sids = [task.sched_id for task in self._tasks]
-                self.safe_release_task_bench(sids)
+    def update_in_next_tick(self):
+        if not self._update_in_next_tick.is_set():
+            self._update_in_next_tick.set()
 
-            self._tasks = self.safe_fetch_tasks()
+    def _tick(self):
+        if self._tick_count % 10 == 0 or self._update_in_next_tick.is_set():
+            self._update_in_next_tick.clear()
+
+            self._tasks = self.sync_database()
 
         for task_type, task_id, sched_id in self.fetch_closed_tasks():
             self.pool.execute(
@@ -90,9 +98,9 @@ class Schedium(object):
                 }
             )
 
-    def fetch_closed_tasks(self):
+    def fetch_closed_tasks(self, tasks=None):
         now = time.time()
-        for task in list(self._tasks):
+        for task in list((tasks or self._tasks)):
             if task.next_time <= now:
                 self._tasks.remove(task)
                 yield task.task_type, task.task_id, task.sched_id
@@ -110,6 +118,7 @@ class Schedium(object):
             logger.warning("exception: {} is occurred".format(e))
         finally:
             self.safe_handle_executed_task(sched_id)
+            self.update_in_next_tick()
 
     @transaction.atomic
     def safe_handle_executed_task(self, sched_id):
@@ -220,6 +229,7 @@ class Schedium(object):
             start_time=start_time, end_time=end_time, interval=interval,
             next_time=next_time, in_sched=False
         )
+        self.update_in_next_tick()
         return task
 
     def shutdown(self):
