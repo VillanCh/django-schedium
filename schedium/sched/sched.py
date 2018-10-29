@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 # coding:utf-8
-import uuid
-import multiprocessing
+import logging
+import time
 import typing
+import uuid
 from datetime import datetime, timedelta
 from threading import Timer, Thread, Event
-import time
 
 from django.db import connections
+from django.db.utils import ProgrammingError
 
 from .handlers import DefaultTaskHandler, ScheduleModelTaskHandler
 
@@ -37,7 +38,7 @@ class Sched(object):
         self._timezone = timezone
         self._daemon_thread = None
 
-        # self.update()
+        self.update()
 
     def start_auto_update(self, empty_update_interval=10, normal_auto_update=30):
         thr = Thread(target=self._auto_update, kwargs={
@@ -110,6 +111,15 @@ class Sched(object):
         self.update()
 
     def update(self):
+        try:
+            return self._update()
+        except ProgrammingError as e:
+            logging.warning("Database Error in update sched with: {}".format(
+                e
+            ))
+            logging.warning("If u are migrating database, ignore this.")
+
+    def _update(self):
         task = self._task_handler.get_next_task()
 
         if not task:

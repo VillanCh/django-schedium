@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # coding:utf-8
-import time
-
+import psycopg2
 from .sched import handlers
 from .sched.sched import Sched
 
@@ -10,9 +9,10 @@ class _Schediumer(object):
 
     def __init__(self):
         self.handler = handlers.ScheduleModelTaskHandler()
+
         self.sched = Sched(update_interval=30, task_handler=self.handler)
 
-        # self.auto_update(30)
+        self.auto_update(30)
 
     def register_task_handler(self, task_type):
         return self.handler.schedium_task_callback(task_type)

@@ -2,15 +2,13 @@
 # coding:utf-8
 import traceback
 import typing
-from functools import wraps
 from datetime import datetime, timedelta
-from django.utils import timezone
+from functools import wraps
+
 from django.db import transaction
+from django.utils import timezone
+
 from schedium import models
-
-SCHEDIUM_MODEL_TASK_HANDLER_CALLBACKS = {
-
-}
 
 
 class SchediumTask(object):
