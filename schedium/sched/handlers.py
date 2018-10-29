@@ -61,7 +61,10 @@ class ScheduleModelTaskHandler(TaskHandlerBase):
 
     def __init__(self):
         self._callbacks = {}
-        self._callbacks.update(SCHEDIUM_MODEL_TASK_HANDLER_CALLBACKS)
+
+    @property
+    def callbacks(self):
+        return dict(self._callbacks)
 
     def register(self, task_type: str, callback: typing.Callable):
         self._callbacks[task_type] = callback
@@ -162,18 +165,14 @@ class ScheduleModelTaskHandler(TaskHandlerBase):
 
         self._release_task(id)
 
+    @transaction.atomic
     def _release_task(self, id):
-        delay_task_queryset = models.SchediumDelayModelTask.objects.filter(is_finished=False)
-        try:
-            delay_task = delay_task_queryset.get(schedium_id=id)
-            delay_task.is_finished = True
-            delay_task.in_sched = False
-            delay_task.save()
-            return
-        except delay_task_queryset.model.DoesNotExist:
-            pass
+        models.SchediumDelayModelTask.objects.select_for_update().filter(
+            schedium_id=id
+        ).update(is_finished=True, in_sched=False)
 
-        loop_task_queryset = models.SchediumLoopModelTask.objects.filter(is_finished=False)
+        loop_task_queryset = models.SchediumLoopModelTask.objects.select_for_update().\
+            filter(is_finished=False)
         try:
             loop_task = loop_task_queryset.get(schedium_id=id)
             now = timezone.now()

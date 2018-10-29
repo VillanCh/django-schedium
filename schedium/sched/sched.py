@@ -128,9 +128,11 @@ class Sched(object):
         if self._current_task:
             # still current task
             if task.id == self._current_task.id and task.next_time == self._current_task.next_execute_time:
+                logging.warning("REPEAT TASK")
                 return
 
             if self._current_task.is_alive():
+                logging.warning("current: {} will be replace with: {}".format(self._current_task, task))
                 self._current_task.cancel()
                 self.delay_task(self._current_task.id)
 
