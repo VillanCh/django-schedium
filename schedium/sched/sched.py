@@ -37,7 +37,7 @@ class Sched(object):
         self._timezone = timezone
         self._daemon_thread = None
 
-        self.update()
+        # self.update()
 
     def start_auto_update(self, empty_update_interval=10, normal_auto_update=30):
         thr = Thread(target=self._auto_update, kwargs={

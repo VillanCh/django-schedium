@@ -12,7 +12,7 @@ class _Schediumer(object):
         self.handler = handlers.ScheduleModelTaskHandler()
         self.sched = Sched(update_interval=30, task_handler=self.handler)
 
-        self.auto_update(30)
+        # self.auto_update(30)
 
     def register_task_handler(self, task_type):
         return self.handler.schedium_task_callback(task_type)
