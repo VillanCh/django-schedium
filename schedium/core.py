@@ -19,7 +19,7 @@ class Schedium(object):
 
     def __init__(self, tick_interval=1, id=None, pool_size=5):
         self._id = id or uuid.uuid4().hex
-
+        self._tasks = []
         self._callbacks = {}
 
         self.pool = Pool(pool_size)
@@ -34,7 +34,6 @@ class Schedium(object):
 
         self.start()
 
-
     def start(self):
         self._tick_thread = Thread(target=self._tick_loop)
         self._tick_thread.daemon = True
@@ -45,6 +44,8 @@ class Schedium(object):
     def _tick_loop(self):
         if not self._tick_start_event.is_set():
             self._tick_start_event.set()
+
+        self._tasks = self.safe_fetch_tasks()
 
         while self._tick_start_event.is_set():
             logger.warning("Schedium: {} tick: {}".format(self._id, time.time()))
@@ -58,9 +59,43 @@ class Schedium(object):
 
         connections.close_all()
 
+
+    def sync_database(self):
+        with transaction.atomic():
+            now = time.time()
+            queryset = models.SchediumTask.objects.select_for_update().filter(
+                next_time__lte=now + 10 * self.tick_interval, in_sched=False, is_finished=False
+            )
+            tasks = [task.dump_named_tuple() for task in queryset.all()]
+            queryset.update(in_sched=True)
+
+        
+        return tasks
+
     def _tick(self):
-        for task_type, task_id, sched_id in self.safe_fetch_tasks():
-            self.execute_task(task_type, task_id, sched_id)
+        if self._tick_count % 10 == 0:
+            if self._tasks:
+                sids = [task.sched_id for task in self._tasks]
+                self.safe_release_task_bench(sids)
+
+            self._tasks = self.safe_fetch_tasks()
+
+        for task_type, task_id, sched_id in self.fetch_closed_tasks():
+            self.pool.execute(
+                self.execute_task,
+                kwargs={
+                    "task_type": task_type,
+                    "task_id": task_id,
+                    "sched_id": sched_id
+                }
+            )
+
+    def fetch_closed_tasks(self):
+        now = time.time()
+        for task in list(self._tasks):
+            if task.next_time <= now:
+                self._tasks.remove(task)
+                yield task.task_type, task.task_id, task.sched_id
 
     def execute_task(self, task_type, task_id, sched_id):
         if task_type not in self._callbacks:
@@ -74,7 +109,36 @@ class Schedium(object):
         except Exception as e:
             logger.warning("exception: {} is occurred".format(e))
         finally:
-            self.safe_release_task(task_id)
+            self.safe_handle_executed_task(sched_id)
+
+    @transaction.atomic
+    def safe_handle_executed_task(self, sched_id):
+        now = time.time()
+        try:
+            job = models.SchediumTask.objects.select_for_update().get(
+                sched_id=sched_id
+            )
+
+            job.last_executed_time = now
+
+            # handle loop
+            if job.interval:
+                while job.next_time < now:
+                    job.next_time += float(job.interval)
+
+                # handle finished
+                if job.end_time:
+                    if job.next_time > job.end_time:
+                        job.is_finished = True
+
+            # handle delay
+            else:
+                job.is_finished = True
+
+            job.in_sched = False
+            job.save(update_fields=["in_sched", "next_time", "is_finished"])
+        except models.SchediumTask.DoesNotExist:
+            return
 
     @transaction.atomic
     def safe_release_task(self, sched_id):
@@ -85,14 +149,22 @@ class Schedium(object):
         )
 
     @transaction.atomic
+    def safe_release_task_bench(self, sched_ids):
+        models.SchediumTask.objects.select_for_update().filter(
+            sched_id__in=sched_ids
+        ).update(
+            in_sched=False
+        )
+
+    @transaction.atomic
     def safe_fetch_tasks(self):
         now = time.time()
         queryset = models.SchediumTask.objects.select_for_update().filter(
-            next_time__lte=now, in_sched=False
+            next_time__lte=now + 10 * self.tick_interval, in_sched=False, is_finished=False
         )
-        ret = list(queryset.values_list("task_type", "task_id", "sched_id", ))
+        tasks = [task.dump_named_tuple() for task in queryset.all()]
         queryset.update(in_sched=True)
-        return ret
+        return tasks
 
     def register(self, task_type: str, callback: typing.Callable):
         self._callbacks[task_type] = callback
@@ -112,26 +184,40 @@ class Schedium(object):
         return register_callback
 
     def delay_task(self, task_type, task_id, delay, sched_id=None):
-        sched_id = sched_id or uuid.uuid4()
+        sched_id = sched_id or uuid.uuid4().hex
         start_time = time.time()
         end_time = time.time() + delay
 
         task = self._create_task(sched_id, task_type, task_id,
                                  start_time=start_time, end_time=end_time,
-                                 interval=None, next_time=end_time, first=True)
+                                 interval=None, next_time=end_time)
 
         return task
 
-    def loop_task(self):
-        pass
+    def loop_task(self, task_type, task_id, loop_interval,
+                  loop_start=None, loop_end=None, sched_id=None,
+                  first=True):
+        sched_id = sched_id or uuid.uuid4().hex
+        loop_start = loop_start or time.time()
+        loop_end = loop_end
+        if first:
+            next_time = loop_start
+        else:
+            next_time = loop_start + loop_interval
+
+        return self._create_task(
+            sched_id, task_type, task_id,
+            start_time=loop_start, end_time=loop_end,
+            interval=loop_interval, next_time=next_time
+        )
 
     def _create_task(self, sched_id, task_type, task_id,
-                     start_time, end_time, interval, next_time, first):
+                     start_time, end_time, interval, next_time):
         task = models.SchediumTask.objects.create(
             # basic
             sched_id=sched_id, task_type=task_type, task_id=task_id,
             # sched
-            first=first, start_time=start_time, end_time=end_time, interval=interval,
+            start_time=start_time, end_time=end_time, interval=interval,
             next_time=next_time, in_sched=False
         )
         return task
@@ -145,7 +231,6 @@ class Schedium(object):
     def reset(self):
         self.shutdown()
         self.start()
-
 
 
 schediumer = Schedium()
