@@ -137,10 +137,8 @@ class Schedium(object):
         return task
 
     def shutdown(self):
-        print("prepare to close connections")
         self._tick_start_event.clear()
         self._tick_thread.join()
-        print("close connections")
 
         self.pool.stop()
 
