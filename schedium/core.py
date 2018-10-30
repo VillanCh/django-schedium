@@ -6,10 +6,10 @@ import typing
 import uuid
 from functools import wraps
 from threading import Thread, Event
+
 from django.db import transaction, connections
 
 from schedium import models
-
 from .pool import Pool
 
 logger = logging.getLogger(__name__)
