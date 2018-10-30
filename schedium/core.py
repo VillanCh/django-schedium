@@ -42,9 +42,20 @@ class Schedium(object):
 
         self.pool.start()
 
+    @transaction.atomic
+    def initial_schedium_database(self):
+        models.SchediumTask.objects.select_for_update().filter(
+            next_time__lte=time.time(),
+            in_sched=True,
+        ).update(
+            in_sched=False
+        )
+
     def _tick_loop(self):
         if not self._tick_start_event.is_set():
             self._tick_start_event.set()
+
+        self.initial_schedium_database()
 
         self._tasks = self.sync_database()
 
