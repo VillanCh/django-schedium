@@ -8,6 +8,7 @@ from functools import wraps
 from threading import Thread, Event
 
 from django.db import transaction, connections
+from django.db.utils import ProgrammingError
 
 from schedium import models
 from .pool import Pool
@@ -55,7 +56,14 @@ class Schedium(object):
         if not self._tick_start_event.is_set():
             self._tick_start_event.set()
 
-        self.initial_schedium_database()
+        while True:
+            try:
+                self.initial_schedium_database()
+                break
+            except ProgrammingError:
+                logger.warning("the initialize-schedium database is failed, retry 2s later.")
+                logger.warning("do u forget to `python manage.py migrate schedium`???")
+                time.sleep(2)
 
         self._tasks = self.sync_database()
 
