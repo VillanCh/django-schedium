@@ -2,6 +2,7 @@
 # coding:utf-8
 import logging
 import time
+import datetime
 import typing
 import uuid
 from functools import wraps
@@ -214,7 +215,10 @@ class Schedium(object):
     def delay_task(self, task_type, task_id, delay, sched_id=None):
         sched_id = sched_id or uuid.uuid4().hex
         start_time = time.time()
-        end_time = time.time() + delay
+        if isinstance(delay, (int, float)):
+            end_time = time.time() + delay
+        elif isinstance(delay, datetime.timedelta):
+            end_time = time.time() + delay.total_seconds()
 
         task = self._create_task(sched_id, task_type, task_id,
                                  start_time=start_time, end_time=end_time,
