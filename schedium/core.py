@@ -219,6 +219,8 @@ class Schedium(object):
             end_time = time.time() + delay
         elif isinstance(delay, datetime.timedelta):
             end_time = time.time() + delay.total_seconds()
+        else:
+            end_time = time.time() + int(delay)
 
         task = self._create_task(sched_id, task_type, task_id,
                                  start_time=start_time, end_time=end_time,
